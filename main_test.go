@@ -10,8 +10,8 @@ import (
 
 type testCase struct {
 	query string
-	want  string
-}
+	want  string // TODO: Use map[string]interface{}
+} // may be add here endpoint string
 
 func TestAdd(t *testing.T) {
 	tests := []testCase{
@@ -23,16 +23,17 @@ func TestAdd(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.query, func(t *testing.T) {
-			req, _ := http.NewRequest("GET", fmt.Sprintf("/sum%s", tc.query), nil)
+			// TODO: Extract this code into a separate func and invoke it with endpoint parameters.
+			req, _ := http.NewRequest("GET", fmt.Sprintf("/sum%s", tc.query), nil) // TODO: Add err handling
 			recorder := httptest.NewRecorder()
 
 			Add(recorder, req)
 
 			var got, want any
-			json.Unmarshal(recorder.Body.Bytes(), &got)
-			json.Unmarshal([]byte(tc.want), &want)
+			json.Unmarshal(recorder.Body.Bytes(), &got) // TODO: Add err handling
+			json.Unmarshal([]byte(tc.want), &want)      // TODO: Add err handling
 
-			if fmt.Sprintf("%v", got) != fmt.Sprintf("%v", want) {
+			if fmt.Sprintf("%v", got) != fmt.Sprintf("%v", want) { // TODO: try to use another func to qualing
 				t.Errorf("%s response was expected for %s request, but %s was received", tc.query, tc.want, recorder.Body.String())
 			}
 		})
@@ -48,7 +49,7 @@ func TestSubtract(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.query, func(t *testing.T) {
-			req, _ := http.NewRequest("GET", fmt.Sprintf("/sum%s", tc.query), nil)
+			req, _ := http.NewRequest("GET", fmt.Sprintf("/sum%s", tc.query), nil) // /sum?
 			recorder := httptest.NewRecorder()
 
 			Subtract(recorder, req)
