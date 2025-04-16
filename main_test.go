@@ -5,112 +5,69 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"testing"
 )
 
 type testCase struct {
-	query string
-	want  string
+	query    string
+	want     map[string]interface{}
+	endpoint string
 }
 
-func TestAdd(t *testing.T) {
+func runTest(tc testCase, function http.HandlerFunc) (error, map[string]interface{}) {
+	req, _ := http.NewRequest("GET", fmt.Sprintf("%s%s", tc.endpoint, tc.query), nil)
+	recorder := httptest.NewRecorder()
+
+	function(recorder, req)
+
+	var got map[string]interface{}
+	err := json.Unmarshal(recorder.Body.Bytes(), &got)
+
+	if err != nil {
+		return err, got
+	}
+
+	return err, got
+}
+
+func TestFunc(t *testing.T) {
 	tests := []testCase{
-		{"?a=5&b=3", `{"result":8}`},
-		{"?a=5&b=abc", `{"error":"Invalid input. Please provide valid numeric values for 'a' and 'b'."}`},
-		{"?a=&b=6", `{"error":"Invalid input. Please provide valid numeric values for 'a' and 'b'."}`},
-		{"?a=5&b=7", `{"result":12}`},
+		{"?a=5&b=3", map[string]interface{}{"result": 8}, "/sum"},
+		{"?a=5&b=abc", map[string]interface{}{"error": "Invalid input. Please provide valid numeric values for 'a' and 'b'."}, "/sum"},
+		{"?a=&b=6", map[string]interface{}{"error": "Invalid input. Please provide valid numeric values for 'a' and 'b'."}, "/sum"},
+		{"?a=5&b=7", map[string]interface{}{"result": -2}, "/minus"},
+		{"?a=5&b=3", map[string]interface{}{"result": 15}, "/multiply"},
+		{"?a=15&b=3", map[string]interface{}{"result": 5}, "/divide"},
+		{"?a=5&b=0", map[string]interface{}{"error": "Division by zero is not allowed."}, "/divide"},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.query, func(t *testing.T) {
-			req, _ := http.NewRequest("GET", fmt.Sprintf("/sum%s", tc.query), nil)
-			recorder := httptest.NewRecorder()
+			var err error
+			var got map[string]interface{}
 
-			Add(recorder, req)
-
-			var got, want any
-			json.Unmarshal(recorder.Body.Bytes(), &got)
-			json.Unmarshal([]byte(tc.want), &want)
-
-			if fmt.Sprintf("%v", got) != fmt.Sprintf("%v", want) {
-				t.Errorf("%s response was expected for %s request, but %s was received", tc.query, tc.want, recorder.Body.String())
+			switch tc.endpoint {
+			case "/sum":
+				err, got = runTest(tc, Add)
+			case "/minus":
+				err, got = runTest(tc, Subtract)
+			case "/multiply":
+				err, got = runTest(tc, Multiply)
+			case "/divide":
+				err, got = runTest(tc, Divide)
 			}
-		})
-	}
-}
-func TestSubtract(t *testing.T) {
-	tests := []testCase{
-		{"?a=5&b=3", `{"result":2}`},
-		{"?a=5&b=abc", `{"error":"Invalid input. Please provide valid numeric values for 'a' and 'b'."}`},
-		{"?a=&b=6", `{"error":"Invalid input. Please provide valid numeric values for 'a' and 'b'."}`},
-		{"?a=5&b=7", `{"result":-2}`},
-	}
 
-	for _, tc := range tests {
-		t.Run(tc.query, func(t *testing.T) {
-			req, _ := http.NewRequest("GET", fmt.Sprintf("/sum%s", tc.query), nil)
-			recorder := httptest.NewRecorder()
-
-			Subtract(recorder, req)
-
-			var got, want any
-			json.Unmarshal(recorder.Body.Bytes(), &got)
-			json.Unmarshal([]byte(tc.want), &want)
-
-			if fmt.Sprintf("%v", got) != fmt.Sprintf("%v", want) {
-				t.Errorf("%s response was expected for %s request, but %s was received", tc.query, tc.want, recorder.Body.String())
+			if err != nil {
+				t.Fatal("Failed to unmarshal response")
 			}
-		})
-	}
-}
 
-func TestMultiply(t *testing.T) {
-	tests := []testCase{
-		{"?a=5&b=3", `{"result":15}`},
-		{"?a=5&b=abc", `{"error":"Invalid input. Please provide valid numeric values for 'a' and 'b'."}`},
-		{"?a=&b=6", `{"error":"Invalid input. Please provide valid numeric values for 'a' and 'b'."}`},
-		{"?a=5&b=7", `{"result":35}`},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.query, func(t *testing.T) {
-			req, _ := http.NewRequest("GET", fmt.Sprintf("/sum%s", tc.query), nil)
-			recorder := httptest.NewRecorder()
-
-			Multiply(recorder, req)
-
-			var got, want any
-			json.Unmarshal(recorder.Body.Bytes(), &got)
-			json.Unmarshal([]byte(tc.want), &want)
-
-			if fmt.Sprintf("%v", got) != fmt.Sprintf("%v", want) {
-				t.Errorf("%s response was expected for %s request, but %s was received", tc.query, tc.want, recorder.Body.String())
+			if want, ok := tc.want["result"].(int); ok {
+				tc.want["result"] = float64(want)
 			}
-		})
-	}
-}
 
-func TestDivide(t *testing.T) {
-	tests := []testCase{
-		{"?a=15&b=3", `{"result":5}`},
-		{"?a=5&b=0", `{"error":"Division by zero is not allowed."}`},
-		{"?a=&b=6", `{"error":"Invalid input. Please provide valid numeric values for 'a' and 'b'."}`},
-		{"?a=7&b=7", `{"result":1}`},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.query, func(t *testing.T) {
-			req, _ := http.NewRequest("GET", fmt.Sprintf("/sum%s", tc.query), nil)
-			recorder := httptest.NewRecorder()
-
-			Divide(recorder, req)
-
-			var got, want any
-			json.Unmarshal(recorder.Body.Bytes(), &got)
-			json.Unmarshal([]byte(tc.want), &want)
-
-			if fmt.Sprintf("%v", got) != fmt.Sprintf("%v", want) {
-				t.Errorf("%s response was expected for %s request, but %s was received", tc.query, tc.want, recorder.Body.String())
+			if !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("%s response was expected for %s request, but %s was received", tc.query, tc.want, got)
 			}
 		})
 	}
